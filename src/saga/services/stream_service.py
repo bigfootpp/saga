@@ -1,3 +1,5 @@
+from loguru import logger
+
 from saga.metadata.base import BaseMetadataProvider
 from saga.metadata.kitsu import KitsuMetadataProvider
 from saga.models.stream import StreamResult
@@ -68,7 +70,7 @@ class StreamService:
 
         with Stopwatch() as watch:
             raw_results = await self.provider.search_series(titles, season, episode)
-            print(f"Scraped {len(raw_results)} in {watch.time}s")
+            logger.info(f"Scraped {len(raw_results)} in {watch.time}s")
 
         raw_results = await self.tracker_client.resolve_peers_count(raw_results)
 
@@ -88,7 +90,7 @@ class StreamService:
         container.add_torrents(raw_results)
 
         with Stopwatch() as watch:
-            print(f"Resolving {len(container.torrents)} torrents")
+            logger.info(f"Resolving {len(container.torrents)} torrents")
             dubs_resolved_torrents = await self.resolver.bulk_resolve(
                 container.dubs,
                 is_valid=is_valid,
@@ -101,7 +103,7 @@ class StreamService:
                 concurrency=15,
                 max_result=max_other_result,
             )
-            print(f"Resolving finished in {watch.time}")
+            logger.info(f"Resolving finished in {watch.time}")
 
         # converting to stream object
         dubs_streams = StreamContainer(
