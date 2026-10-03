@@ -56,7 +56,11 @@ def _find_file_idx_series(
     abs_candidates: list[TorrentFileEntry] = []
     for file in torrent.files:
         # check if episode is in file_name to avoid call slow guessit
-        if not _valid_extension(file) or str(episode) not in file.file_name:
+        if (
+            not _valid_extension(file)
+            or str(episode) not in file.file_name
+            or (abs_episode is not None and str(abs_episode) not in file.file_name)
+        ):
             continue
 
         all_videos_file.append(file)
