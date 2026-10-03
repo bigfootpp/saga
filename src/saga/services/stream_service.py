@@ -39,91 +39,106 @@ class StreamService:
         max_dub_result: int = 10,
         max_other_result: int = 10,
     ) -> StreamResult:
-        metadata = await self.metadata_querier.get_series_metadata_id(media_id)
+        with Stopwatch() as global_watch:
+            logger.info(f"Incoming request for type=series, id={media_id}")
+            metadata = await self.metadata_querier.get_series_metadata_id(media_id)
 
-        abs_episode = episode
-        if metadata.episodes:
-            count = 0
-            for metadata_episode in metadata.episodes:
-                if metadata_episode.season > 0:
-                    count += 1
+            abs_episode = episode
+            if metadata.episodes:
+                count = 0
+                for metadata_episode in metadata.episodes:
+                    if metadata_episode.season > 0:
+                        count += 1
 
-            abs_episode = count
+                abs_episode = count
 
-        titles_set: set[str] = {
-            metadata.titles[dub]
-            for dub in set(dubs) | {"original", "en"}
-            if metadata.titles.get(dub)
-        }
-
-        if "anime" in metadata.keywords:
-            kitsu_metadata = (
-                await self.kitsu_metadata_querier.get_series_metadata_title(
-                    metadata.titles["en"]
-                )
-            )
-            titles_set |= {
-                title for title in kitsu_metadata.titles.values() if title.strip()
+            titles_set: set[str] = {
+                metadata.titles[dub]
+                for dub in set(dubs) | {"original", "en"}
+                if metadata.titles.get(dub)
             }
 
-        titles = list(titles_set)
+            if "anime" in metadata.keywords:
+                kitsu_metadata = (
+                    await self.kitsu_metadata_querier.get_series_metadata_title(
+                        metadata.titles["en"]
+                    )
+                )
+                titles_set |= {
+                    title for title in kitsu_metadata.titles.values() if title.strip()
+                }
 
-        with Stopwatch() as watch:
-            raw_results = await self.provider.search_series(titles, season, episode)
-            logger.info(f"Scraped {len(raw_results)} in {watch.time}s")
+            titles = list(titles_set)
 
-        raw_results = await self.tracker_client.resolve_peers_count(raw_results)
+            with Stopwatch() as watch:
+                logger.info(f"Searching for {media_id} in {len(titles_set)} languages")
+                raw_results = await self.provider.search_series(titles, season, episode)
+                logger.info(
+                    f"Provider returned {len(raw_results)} for {media_id} in {watch.time}s"
+                )
 
-        def is_valid(torrent: ResolvedTorrent) -> bool:
-            # if (
-            #     torrent.distributed_copies is not None
-            #     and torrent.distributed_copies < 1
-            # ):
-            #     return False
-            file_idx = find_file_idx(torrent, season, episode, abs_episode)
-            return file_idx is not None
+            raw_results = await self.tracker_client.resolve_peers_count(raw_results)
 
-        # filter raw torrent before resolving to not wasting time on unwanted streams
-        container = RawTorrentContainer(
-            titles, dubs, metadata.original_language, episode, season
-        )
-        container.add_torrents(raw_results)
+            def is_valid(torrent: ResolvedTorrent) -> bool:
+                # if (
+                #     torrent.distributed_copies is not None
+                #     and torrent.distributed_copies < 1
+                # ):
+                #     return False
+                file_idx = find_file_idx(torrent, season, episode, abs_episode)
+                return file_idx is not None
 
-        with Stopwatch() as watch:
-            logger.info(f"Resolving {len(container.torrents)} torrents")
-            dubs_resolved_torrents = await self.resolver.bulk_resolve(
-                container.dubs,
-                is_valid=is_valid,
-                concurrency=15,
-                max_result=max_dub_result,
+            # filter raw torrent before resolving to not wasting time on unwanted streams
+            logger.info(f"Preflitering {len(raw_results)} results for {media_id}")
+            container = RawTorrentContainer(
+                titles, dubs, metadata.original_language, episode, season
             )
-            other_resolved_torrents = await self.resolver.bulk_resolve(
-                container.others,
-                is_valid=is_valid,
-                concurrency=15,
-                max_result=max_other_result,
+            container.add_torrents(raw_results)
+            logger.info(
+                f"Dropped {len(raw_results) - len(container.torrents)} ({len(container.torrents)} remaining) result for {media_id}"
             )
-            logger.info(f"Resolving finished in {watch.time}")
 
-        # converting to stream object
-        dubs_streams = StreamContainer(
-            season, episode, metadata.original_language, abs_episode
-        )
-        others_streams = StreamContainer(
-            season, episode, metadata.original_language, abs_episode
-        )
+            with Stopwatch() as watch:
+                logger.info(f"Fetching {len(container.torrents)} result for {media_id}")
+                dubs_resolved_torrents = await self.resolver.bulk_resolve(
+                    container.dubs,
+                    is_valid=is_valid,
+                    concurrency=15,
+                    max_result=max_dub_result,
+                )
+                other_resolved_torrents = await self.resolver.bulk_resolve(
+                    container.others,
+                    is_valid=is_valid,
+                    concurrency=15,
+                    max_result=max_other_result,
+                )
+                logger.info(
+                    f"{len(dubs_resolved_torrents) + len(other_resolved_torrents)} result fetched in {watch.time}s for {media_id}"
+                )
 
-        for is_dub, torrents in (
-            (True, dubs_resolved_torrents),
-            (False, other_resolved_torrents),
-        ):
-            for torrent in torrents:
-                if torrent.seeders > 0:
-                    if is_dub:
-                        dubs_streams.add_torrents(torrent)
-                    else:
-                        others_streams.add_torrents(torrent)
+            # converting to stream object
+            dubs_streams = StreamContainer(
+                season, episode, metadata.original_language, abs_episode
+            )
+            others_streams = StreamContainer(
+                season, episode, metadata.original_language, abs_episode
+            )
 
-        return StreamResult(
-            dubs_stream=dubs_streams.streams, others=others_streams.streams
-        )
+            for is_dub, torrents in (
+                (True, dubs_resolved_torrents),
+                (False, other_resolved_torrents),
+            ):
+                for torrent in torrents:
+                    if torrent.seeders > 0:
+                        if is_dub:
+                            dubs_streams.add_torrents(torrent)
+                        else:
+                            others_streams.add_torrents(torrent)
+
+            logger.info(
+                f"{len(dubs_streams.streams) + len(others_streams.streams)} stream returned in {global_watch.time} for {media_id}"
+            )
+
+            return StreamResult(
+                dubs_stream=dubs_streams.streams, others=others_streams.streams
+            )
