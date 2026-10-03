@@ -34,18 +34,6 @@ def _valid_extension(file: TorrentFileEntry) -> bool:
     return ext in VIDEO_EXTENSIONS
 
 
-def _valid_file(file: TorrentFileEntry, season: int) -> bool:
-    if not _valid_extension(file):
-        return False
-    parsed_file_name_data = parse(file.file_name)
-    if not parsed_file_name_data.seasons:
-        return True
-    return (
-        len(parsed_file_name_data.seasons) == 1
-        and season in parsed_file_name_data.seasons
-    )
-
-
 def best_candidate(
     candidates: list[TorrentFileEntry], size_median: float
 ) -> TorrentFileEntry:
@@ -67,11 +55,18 @@ def _find_file_idx_series(
     candidates: list[TorrentFileEntry] = []
     abs_candidates: list[TorrentFileEntry] = []
     for file in torrent.files:
-        if not _valid_file(file, season):
+        # check if episode is in file_name to avoid call slow guessit
+        if not _valid_extension(file) or str(episode) not in file.file_name:
             continue
-        all_videos_file.append(file)
 
+        all_videos_file.append(file)
         parsed_file_name = parse(file.file_name)
+        if (
+            parsed_file_name.seasons
+            and len(parsed_file_name.seasons) != 1
+            and season not in parsed_file_name.seasons
+        ):
+            continue
         if len(parsed_file_name.episodes) == 1 and episode in parsed_file_name.episodes:
             candidates.append(file)
         elif (
@@ -97,16 +92,7 @@ def _find_file_idx_movie(torrent: ResolvedTorrent) -> int:
     largest_file = max(torrent.files, key=lambda x: x.size)
     if not _valid_extension(largest_file):
         return largest_file.file_idx
-    # parsed_name = parse(torrent.title)
     return largest_file.file_idx
-    # return Stream(
-    #     torrent_name=torrent.title,
-    #     raw_name=largest_file.file_name,
-    #     info_hash=torrent.info_hash,
-    #     dubs_language=parsed_name.audio_languages,
-    #     sources=parse_trackers(torrent.magnet),
-    #     file_idx=largest_file.file_idx,
-    # )
 
 
 def check_torrent_coverage(torrent_name: str, season: int, episode: int) -> bool:
@@ -230,5 +216,3 @@ def matches_titles(torrent_name: str, titles: list[str]) -> bool:
         if title in normalized_title:
             return True
     return False
-
-    # return parsed_name.title.strip().lower() in titles_set
