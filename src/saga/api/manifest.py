@@ -1,13 +1,13 @@
 from fastapi import APIRouter
 
-from saga.models.manifest import ManifestResponse
+from saga.models.manifest import BehaviorHints, ManifestResponse
 
 router = APIRouter()
 
 
 @router.get("/manifest.json")
 @router.get("/{config}/manifest.json")
-async def get_manifest() -> ManifestResponse:
+async def get_manifest(config: str | None = None) -> ManifestResponse:
     return ManifestResponse(
         id="community.bigfootpp.saga",
         icon="",  # "https://i.imgur.com/tVjqEJP.png",
@@ -18,4 +18,7 @@ async def get_manifest() -> ManifestResponse:
         resources=["stream"],
         types=["series"],  # movies not implement yet
         catalogs=[],
+        behaviorHints=BehaviorHints(
+            configurable=True, configurationRequired=not config
+        ),
     )
