@@ -1,7 +1,8 @@
 from itertools import chain
 
 from saga.models.stream import StreamResult, StremioStream, StremioStreamResult
-from saga.services.formatter import Formatter
+from saga.utils.formatter import get_language_flag
+from saga.utils.guessit import parse
 
 
 def parse_series_id(full_id: str) -> tuple[str, int, int] | None:
@@ -20,14 +21,19 @@ def parse_series_id(full_id: str) -> tuple[str, int, int] | None:
 
 
 def convert_to_stremio_stream_result(
-    stream_result: StreamResult, name: str, formatter: Formatter
+    stream_result: StreamResult,
 ) -> StremioStreamResult:
     results: list[StremioStream] = []
     for stream in chain(stream_result.dubs_stream, stream_result.others):
+        parsed_name = parse(stream.torrent_name)
+        dubs = stream.dubs_language
+        flags = [get_language_flag(dub) for dub in dubs]
         results.append(
             StremioStream(
-                name=name,
-                description=formatter.format(stream.torrent_name),
+                name="[Saga]" + f"\n{parsed_name.video_quality}"
+                if parsed_name.video_quality
+                else "",
+                description=f"{stream.torrent_name}\n{stream.raw_name}\n{''.join(flags)}",
                 fileIdx=stream.file_idx,
                 infoHash=stream.info_hash,
                 sources=[f"tracker:{source}" for source in stream.sources],
