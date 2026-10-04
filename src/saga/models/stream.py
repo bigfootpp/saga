@@ -7,6 +7,8 @@ class Stream(BaseModel):
     dubs_language: list[str]
     info_hash: str
     file_idx: int
+    seeders: int
+    size: int
     sources: list[str]
 
 

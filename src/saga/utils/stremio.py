@@ -33,7 +33,10 @@ def convert_to_stremio_stream_result(
                 name="[Saga]" + f"\n{parsed_name.video_quality}"
                 if parsed_name.video_quality
                 else "",
-                description=f"{stream.torrent_name}\n{stream.raw_name}\n{''.join(flags)}",
+                description=f"""{stream.torrent_name}
+                {stream.raw_name}
+                👤{stream.seeders}
+                {"".join(flags)}""",
                 fileIdx=stream.file_idx,
                 infoHash=stream.info_hash,
                 sources=[f"tracker:{source}" for source in stream.sources],
