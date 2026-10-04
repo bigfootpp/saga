@@ -9,12 +9,6 @@ from saga.metadata.kitsu import KitsuMetadataProvider
 from saga.metadata.tmdb import TMDBMetadataProvider
 from saga.models.stream import StremioStreamResult
 from saga.providers.jackett import JackettProvider
-from saga.services.formatter import (
-    DubsLanguagesElement,
-    Formatter,
-    NewLineElement,
-    RawNameElement,
-)
 from saga.services.stream_service import StreamService
 from saga.torrent.cached_resolver import CachedTorrentResolver
 from saga.torrent.db import TorrentDatabaseRepo
@@ -45,9 +39,6 @@ stream_service = StreamService(
 )
 
 
-formatter = Formatter(RawNameElement(), NewLineElement(), DubsLanguagesElement())
-
-
 @router.get("/{configb64}/stream/{stream_type}/{stream_id}")
 @router.get("/{configb64}/stream/{stream_type}/{stream_id}.json")
 async def stream(
@@ -71,5 +62,5 @@ async def stream(
                     max_other_result=config.other_max_results,
                 )
 
-                return convert_to_stremio_stream_result(result, "Saga", formatter)
+                return convert_to_stremio_stream_result(result)
     return StremioStreamResult(streams=[])

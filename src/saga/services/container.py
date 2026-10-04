@@ -80,9 +80,11 @@ class StreamContainer:
             stream = Stream(
                 torrent_name=torrent.title,
                 raw_name=torrent.files[file_idx].file_name,
+                size=torrent.files[file_idx].size,
                 dubs_language=extract_audio_languages(
                     torrent.title, original_language=self._original_language
                 ),
+                seeders=torrent.seeders,
                 info_hash=torrent.info_hash,
                 file_idx=file_idx,
                 sources=parse_trackers(torrent.magnet),

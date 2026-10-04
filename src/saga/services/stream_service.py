@@ -45,12 +45,16 @@ class StreamService:
 
             abs_episode = episode
             if metadata.episodes:
-                count = 0
+                count = 1
                 for metadata_episode in metadata.episodes:
                     if metadata_episode.season > 0:
+                        if (
+                            metadata_episode.season == season
+                            and metadata_episode.episode == episode
+                        ):
+                            abs_episode = count
+                            break
                         count += 1
-
-                abs_episode = count
 
             titles_set: set[str] = {
                 metadata.titles[dub]
