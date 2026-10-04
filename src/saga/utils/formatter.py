@@ -77,7 +77,18 @@ LANGUAGE_TO_FLAG: dict[str, str] = {
     "und": "❓",
 }
 
+SIZE_UNIT = ("B", "KB", "MB", "GB", "TB")
+
 
 def get_language_flag(lang_code: str) -> str:
     code = lang_code.lower().strip()
     return LANGUAGE_TO_FLAG.get(code, f"[{code.upper()}]")
+
+
+def format_size(size: float) -> str:
+    i = 0
+    while size >= 1024:
+        size = size / 1024
+        i += 1
+
+    return f"{size:.2f}{SIZE_UNIT[min(i, len(SIZE_UNIT) - 1)]}"

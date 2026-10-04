@@ -1,7 +1,7 @@
 from itertools import chain
 
 from saga.models.stream import StreamResult, StremioStream, StremioStreamResult
-from saga.utils.formatter import get_language_flag
+from saga.utils.formatter import format_size, get_language_flag
 from saga.utils.guessit import parse
 
 
@@ -33,10 +33,12 @@ def convert_to_stremio_stream_result(
                 name="[Saga]" + f"\n{parsed_name.video_quality}"
                 if parsed_name.video_quality
                 else "",
-                description=f"""{stream.torrent_name}
-                {stream.raw_name}
-                👤{stream.seeders}
-                {"".join(flags)}""",
+                description=(
+                    f"{stream.torrent_name}\n"
+                    f"{stream.raw_name}\n"
+                    f"👤{stream.seeders} | 💾 {format_size(stream.size)}\n"
+                    f"{' | '.join(flags)}"
+                ),
                 fileIdx=stream.file_idx,
                 infoHash=stream.info_hash,
                 sources=[f"tracker:{source}" for source in stream.sources],
