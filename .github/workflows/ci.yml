@@ -24,3 +24,6 @@ jobs:
 
       - name: basedpyright check
         run: uv run basedpyright
+
+      - name: ruff check
+        run: uv run ruff check .
